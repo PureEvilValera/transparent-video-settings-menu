@@ -1,0 +1,5 @@
+# Built bundles and staging are not sources.
+dist/
+out/
+target/
+*.hnmod

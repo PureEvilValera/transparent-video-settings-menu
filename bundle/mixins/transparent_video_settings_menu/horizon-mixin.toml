@@ -1,0 +1,35 @@
+[mod]
+id = "transparent_video_settings_menu"
+version = "0.1.0"
+priority = 0
+
+# The commit it was tested on: repack.sh rewrites this line on every run.
+[compatibility]
+horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
+
+# The settings screens (graphics, controller, shader packs) draw the world's
+# background and a see-through veil under themselves. In a world that is the
+# dimming that hides the world while a shader pack is tuned: draw neither.
+# Outside a world (the title screen) the original look stays.
+[[injection]]
+id = "backdrop"
+target = "horizon_client_render::settings_shell::backdrop"
+kind = "OVERWRITE"
+helper = "backdrop.rs"
+bindings = [
+  { name = "batch", ty = "&mut crate::hud::HudBatch", value = "batch" },
+  { name = "atlas", ty = "&crate::hud::HudAtlas", value = "atlas" },
+  { name = "in_world", ty = "bool", value = "in_world" },
+]
+
+# `menuBackgroundBlurriness` would still blur the world behind them: while a
+# world is loaded, the settings screen asks for no blur.
+[[injection]]
+id = "blur"
+target = "horizon_client::game::screen_backgrounds::Game<'_>::menu_blur"
+kind = "HEAD"
+cancellable = true
+helper = "blur.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "self" },
+]
