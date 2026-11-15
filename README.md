@@ -69,9 +69,9 @@ After a Horizon update:
 
 It reads the revision the instance's build used from
 `~/.local/share/horizon-launcher/versions/<version>/native-mods.json`, rewrites
-both pins, runs `horizon-mixins plan` against the pristine source (a target that
-moved fails here, not at build time) and repacks the bundle into
-`~/.local/share/horizon/horizon-native-mods/` and `dist/`. Then build again.
+both pins, validates the bundle (`tools/ci.py check`), packages it
+(`tools/ci.py package`) and installs the result into
+`~/.local/share/horizon/horizon-native-mods/`. Then build again.
 
 `HORIZON_REVISION=<commit> ./repack.sh` pins another Nightly than the one the
 instance plays.
@@ -98,15 +98,39 @@ horizon-launcher native-build --trust-native-code
 - Like any native mod, it pins one Horizon commit and must be rebuilt for a new
   one.
 
-## Release
+## Continuous integration
+
+`tools/ci.py` is the whole pipeline; the workflows only call it.
+
+| Workflow | Runs on | Does |
+|---|---|---|
+| `.github/workflows/check.yml` | every push, every pull request | `tools/ci.py check`: downloads Horizon's source archive at the pinned commit, builds horizon-mixins at the pinned commit, and has it `plan` the bundle. Then packages it and asserts the archive holds `horizon-native.json`, the bundle's sources and `mixins/<id>/LICENSE`. |
+| `.github/workflows/release.yml` | tags `v*` | the same check, then `tools/ci.py package`, then `gh release create <tag> dist/<id>-<version>.hnmod` with the SHA-256 in the notes. It fails unless the tag is `v<version>` from `horizon-mixin.toml`. |
+
+The game itself is **not** compiled in CI. That check (on the newest Nightly,
+together with the popular native mods) is the registry's own `native-compat`
+job, and a Horizon build needs tens of GB and minutes of CPU per comment; the
+local launcher does it better.
+
+What the workflows need: nothing but `contents: write` on the release job
+(`gh` and `GITHUB_TOKEN` are on the runner already). No secrets, no launcher, no
+game files.
 
 ```sh
-./repack.sh
-gh release create v0.1.0 dist/transparent_video_settings_menu-0.1.0.hnmod \
-  --title "0.1.0" --notes "Drops the dimming and blur behind Horizon's settings screens in a world."
+# the same two steps locally, against the sources the launcher already has
+HORIZON_SOURCE=~/.local/share/horizon-launcher/native/source/<commit> python3 tools/ci.py check
+python3 tools/ci.py package
 ```
 
-`dist/` and `*.hnmod` are gitignored: the bundle is a release asset, the sources
-in `bundle/` are what the registry reviews.
+`tools/ci.py package` is deterministic: fixed timestamps, sorted entries, zip
+header forced to Unix, so the same sources always give the same SHA-256. It
+writes the manifest with `"hooks": 1`: this bundle injects by source target, not
+by a named hook point, so any Horizon can carry it, and a target that moved is a
+skip with a warning in `native/build.log` rather than a failed build.
+
+Releasing is then: bump `version` in `bundle/mixins/<id>/horizon-mixin.toml`,
+commit, `git tag v0.1.2 && git push --tags`. `dist/` and `*.hnmod` stay
+gitignored: the bundle is a release asset, the sources in `bundle/` are what the
+registry reviews.
 
 License: [MIT](LICENSE).

@@ -1,0 +1,57 @@
+# A release from a tag: validate, package, and attach the .hnmod. No local tooling needed.
+# Tag v0.1.1 must match the mod's version in bundle/mixins/<id>/horizon-mixin.toml.
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (default: the pushed tag)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_VERSION: "1.99.1"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .ci/horizon
+      - name: The tag matches the mod's version
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          version=$(python3 -c 'import tomllib,glob;print(tomllib.load(open(glob.glob("bundle/mixins/*/horizon-mixin.toml")[0],"rb"))["mod"]["version"])')
+          [ "v$version" = "$TAG" ] || { echo "tag $TAG is not v$version"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Plan the bundle on the pinned Horizon
+        run: python3 tools/ci.py check
+      - name: Package
+        run: |
+          python3 tools/ci.py package | tee package.json
+          python3 -c 'import json;d=json.load(open("package.json"));print("SHA256="+d["sha256"])' >> "$GITHUB_ENV"
+          python3 -c 'import json;d=json.load(open("package.json"));print("FILE="+d["file"])' >> "$GITHUB_ENV"
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release create "$TAG" "$FILE" \
+            --title "$VERSION" \
+            --notes "no_menu_dim $VERSION: the dimming and the menu blur behind Horizon's settings screens are cancelled in a world. SHA-256: $SHA256" \
+            --verify-tag --generate-notes || gh release upload "$TAG" "$FILE" --clobber
