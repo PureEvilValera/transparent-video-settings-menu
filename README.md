@@ -32,7 +32,7 @@ digits and `_`); the display name is "Transparent Video Settings Menu".
 Native mods are not sandboxed: they are compiled into the client and run with
 your rights. Read the source before building it.
 
-Built against Horizon `fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca` (Nightly
+Built against Horizon `9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0` (Nightly
 2026-11-13) with horizon-mixins `5a64af938ec86b00d53d16a408aabc0038fb3e57`.
 On another build the launcher may need `--allow-version-mismatch`, or re-pin the
 bundle first (see [Re-pin](#re-pin)).
@@ -41,7 +41,7 @@ bundle first (see [Re-pin](#re-pin)).
 
 | Injection | Target | Behavior |
 |---|---|---|
-| `backdrop` (OVERWRITE) | `horizon_client_render::settings_shell::backdrop` | returns early when `in_world`: no tiled background, no `style::VEIL` |
+| `backdrop` (HEAD, cancellable) | `horizon_client_render::settings_shell::backdrop` | `Break(())` when `in_world`: the tiled background and the veil are never drawn; the body and its theme colours are left to the game, so a moved colour does not break this mod |
 | `blur` (HEAD, cancellable) | `horizon_client::game::screen_backgrounds::Game<'_>::menu_blur` | `Break(None)` when a world is loaded and the screen is `Screen::Options`, so `menuBackgroundBlurriness` does not blur it |
 
 `settings_shell::backdrop` is shared by `graphics_ui`, `controller_ui` and
@@ -72,6 +72,9 @@ It reads the revision the instance's build used from
 both pins, runs `horizon-mixins plan` against the pristine source (a target that
 moved fails here, not at build time) and repacks the bundle into
 `~/.local/share/horizon/horizon-native-mods/` and `dist/`. Then build again.
+
+`HORIZON_REVISION=<commit> ./repack.sh` pins another Nightly than the one the
+instance plays.
 
 `E_TARGET_NOT_FOUND` means a target function was renamed: fix `target` in
 `bundle/mixins/transparent_video_settings_menu/horizon-mixin.toml`. If a mod does not validate at

@@ -1,20 +1,22 @@
 [mod]
 id = "transparent_video_settings_menu"
-version = "0.1.0"
+version = "0.1.1"
 priority = 0
 
 # The commit it was tested on: repack.sh rewrites this line on every run.
 [compatibility]
-horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
 
 # The settings screens (graphics, controller, shader packs) draw the world's
 # background and a see-through veil under themselves. In a world that is the
 # dimming that hides the world while a shader pack is tuned: draw neither.
-# Outside a world (the title screen) the original look stays.
+# Outside a world (the title screen) the original body runs, so the theme's own
+# colours stay the game's and this mod survives their moving between Nightlies.
 [[injection]]
 id = "backdrop"
 target = "horizon_client_render::settings_shell::backdrop"
-kind = "OVERWRITE"
+kind = "HEAD"
+cancellable = true
 helper = "backdrop.rs"
 bindings = [
   { name = "batch", ty = "&mut crate::hud::HudBatch", value = "batch" },

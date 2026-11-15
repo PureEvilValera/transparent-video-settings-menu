@@ -20,7 +20,8 @@ dist=$here/dist
 installed_version=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["instances"]["horizon"]["version"])' \
   "$data/instances.json")
 info=$data/versions/$installed_version/native-mods.json
-revision=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["horizon"])' "$info")
+# HORIZON_REVISION pins another Nightly than the one the instance plays.
+revision=${HORIZON_REVISION:-$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["horizon"])' "$info")}
 mixins=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["horizon_mixins"])' "$info")
 source=$data/native/source/$revision
 tool=$data/native/tools/${mixins:0:12}/bin/horizon-mixins
