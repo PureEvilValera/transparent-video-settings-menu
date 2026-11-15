@@ -53,5 +53,5 @@ jobs:
         run: |
           gh release create "$TAG" "$FILE" \
             --title "$VERSION" \
-            --notes "no_menu_dim $VERSION: the dimming and the menu blur behind Horizon's settings screens are cancelled in a world. SHA-256: $SHA256" \
+            --notes "Transparent Video Settings Menu $VERSION: the dimming and the menu blur behind Horizon's settings screens are cancelled in a world. SHA-256: $SHA256" \
             --verify-tag --generate-notes || gh release upload "$TAG" "$FILE" --clobber

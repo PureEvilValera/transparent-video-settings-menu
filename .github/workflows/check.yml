@@ -45,7 +45,7 @@ jobs:
           assert manifest["schema"] == 1, manifest
           assert manifest["hooks"] >= 1, manifest
           bundle = f"mixins/{manifest['id']}/"
-          assert "horizon-mixin.toml" in names and f"{bundle}LICENSE" in names, names
+          assert f"{bundle}horizon-mixin.toml" in names and f"{bundle}LICENSE" in names, names
           assert all(n.startswith(bundle) or n == "horizon-native.json" for n in names), names
           print(path, manifest)
           PY

@@ -11,10 +11,8 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 data=${HORIZON_DATA:-$HOME/.local/share/horizon-launcher}
 game=${HORIZON_GAME:-$HOME/.local/share/horizon}
-bundle=$here/bundle
-manifest=$bundle/horizon-native.json
 mixin=$(ls "$here"/bundle/mixins/*/horizon-mixin.toml)
-id=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["id"])' "$manifest")
+id=$(python3 -c 'import sys,tomllib;print(tomllib.load(open(sys.argv[1],"rb"))["mod"]["id"])' "$mixin")
 enabled_file=$game/horizon-mods.txt
 
 # The Horizon revision and horizon-mixins hash the instance's build used.

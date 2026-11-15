@@ -51,12 +51,12 @@ original look is kept.
 ## Layout
 
 ```text
-bundle/horizon-native.json                     the .hnmod manifest (exact pins)
-bundle/mixins/transparent_video_settings_menu/horizon-mixin.toml   injections
+bundle/mixins/transparent_video_settings_menu/horizon-mixin.toml   injections, the mod's id and version
 bundle/mixins/transparent_video_settings_menu/backdrop.rs
 bundle/mixins/transparent_video_settings_menu/blur.rs
 compatibility.json                             pinned Horizon / horizon-mixins revisions
-repack.sh                                      re-pin, validate with `plan`, repack
+repack.sh                                      re-pin, validate, package and install locally
+tools/ci.py                                    the same two steps for CI (check, package)
 ```
 
 ## Re-pin
