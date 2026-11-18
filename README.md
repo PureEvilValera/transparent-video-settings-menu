@@ -1,5 +1,7 @@
 # Transparent Video Settings Menu
 
+Deprecated in Horizon from 18.11.2026
+
 A [Horizon](https://github.com/ludovic111/horizon) native mod (a
 [horizon-mixins](https://github.com/horizon-rust/horizon-mixins) source-mixin
 bundle) that keeps the world visible while the settings screens are open: no
