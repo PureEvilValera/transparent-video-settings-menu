@@ -1,0 +1,143 @@
+#!/bin/sh
+# Horizon for shader debugging: the settings and shader-pack screens draw no dimming behind
+# them, so a shader pack is judged on the world it is drawn on.
+#
+# What it does, in order:
+#   1. installs and turns on a small resource pack that blanks the menu background textures
+#      (`gui/inworld_menu_background`, `gui/menu_background`, the list and options backgrounds),
+#      so the tiled backdrop and the vanilla panels are gone;
+#   2. starts Horizon through the launcher with HORIZON_MENU_STYLE=vanilla. The 18 November build
+#      (`0b14f8a`) and newer honour it: their settings pages draw on vanilla's surfaces, which
+#      skip the veil (`graphics_style::veil_over` returns early for them). Older builds ignore
+#      the variable, and there only the resource pack takes effect (the veil stays), so the
+#      script says so;
+#   3. passes the version and the rest of the command line through.
+#
+#   horizon-for-shader-debug                 # the newest installed version
+#   horizon-for-shader-debug 9f42064         # any installed version, by a part of its name
+#   horizon-for-shader-debug 9f42064 --world Test
+#   horizon-for-shader-debug --dry-run       # print what would run, install nothing
+#
+# Env: HORIZON_LAUNCHER (default ~/Minecraft/horizon-launcher), HORIZON_PACK (default
+#      see_through_settings.zip), HORIZON_DATA (default ~/.local/share/horizon-launcher).
+set -eu
+
+launcher=${HORIZON_LAUNCHER:-$HOME/Minecraft/horizon-launcher}
+pack=${HORIZON_PACK:-see_through_settings.zip}
+data=${HORIZON_DATA:-$HOME/.local/share/horizon-launcher}
+
+dry=0
+if [ "${1:-}" = "--dry-run" ]; then
+    dry=1
+    shift
+fi
+wanted=${1:-}
+if [ -n "$wanted" ]; then
+    shift
+fi
+
+[ -x "$launcher" ] || {
+    echo "no launcher at $launcher (set HORIZON_LAUNCHER)" >&2
+    exit 1
+}
+
+# The see-through pack, as a zip: pack.mcmeta plus fully transparent menu background textures.
+# Kept here so the script is the whole download. `base64 -d` reads it back.
+pack_zip() {
+    base64 -d <<'PACK' >"$1"
+UEsDBBQAAAAIAM+Zcl17pI61RgAAAEsAAAA5AAAAYXNzZXRzL21pbmVjcmFmdC90ZXh0dXJlcy9n
+dWkvaW53b3JsZF9tZW51X2JhY2tncm91bmQucG5n6wzwc+flkuJiYGDg9fRwCQLSAiDMwQYk5T//
+TwRSQp4ujiEVt5ITJFgXJ4j0MHEwMLAIMDCud+3QAcoyeLr6uaxzSmgCAFBLAwQUAAAACADPmXJd
+e6SOtUYAAABLAAAAPgAAAGFzc2V0cy9taW5lY3JhZnQvdGV4dHVyZXMvZ3VpL2lud29ybGRfbWVu
+dV9saXN0X2JhY2tncm91bmQucG5n6wzwc+flkuJiYGDg9fRwCQLSAiDMwQYk5T//TwRSQp4ujiEV
+t5ITJFgXJ4j0MHEwMLAIMDCud+3QAcoyeLr6uaxzSmgCAFBLAwQUAAAACADPmXJde6SOtUYAAABL
+AAAAMQAAAGFzc2V0cy9taW5lY3JhZnQvdGV4dHVyZXMvZ3VpL21lbnVfYmFja2dyb3VuZC5wbmfr
+DPBz5+WS4mJgYOD19HAJAtICIMzBBiTlP/9PBFJCni6OIRW3khMkWBcniPQwcTAwsAgwMK537dAB
+yjJ4uvq5rHNKaAIAUEsDBBQAAAAIAM+Zcl17pI61RgAAAEsAAAA2AAAAYXNzZXRzL21pbmVjcmFm
+dC90ZXh0dXJlcy9ndWkvbWVudV9saXN0X2JhY2tncm91bmQucG5n6wzwc+flkuJiYGDg9fRwCQLS
+AiDMwQYk5T//TwRSQp4ujiEVt5ITJFgXJ4j0MHEwMLAIMDCud+3QAcoyeLr6uaxzSmgCAFBLAwQU
+AAAACADPmXJde6SOtUYAAABLAAAANAAAAGFzc2V0cy9taW5lY3JhZnQvdGV4dHVyZXMvZ3VpL29w
+dGlvbnNfYmFja2dyb3VuZC5wbmfrDPBz5+WS4mJgYOD19HAJAtICIMzBBiTlP/9PBFJCni6OIRW3
+khMkWBcniPQwcTAwsAgwMK537dAByjJ4uvq5rHNKaAIAUEsDBBQAAAAIAM+Zcl0dxribWQAAAGYA
+AAALAAAAcGFjay5tY21ldGGr5lJQUCpITM5WslKoBrKhvPi0/KLcxBKgoLGJDkQ4JbU4uSizoCQz
+Pw8orBRSlJhXXJBYlJpXolCcWlKSmZderJAE1JpelF+al6KgUZJaXKKpBNRby1ULAFBLAQIUAxQA
+AAAIAM+Zcl17pI61RgAAAEsAAAA5AAAAAAAAAAAAAACkgQAAAABhc3NldHMvbWluZWNyYWZ0L3Rl
+eHR1cmVzL2d1aS9pbndvcmxkX21lbnVfYmFja2dyb3VuZC5wbmdQSwECFAMUAAAACADPmXJde6SO
+tUYAAABLAAAAPgAAAAAAAAAAAAAApIGdAAAAYXNzZXRzL21pbmVjcmFmdC90ZXh0dXJlcy9ndWkv
+aW53b3JsZF9tZW51X2xpc3RfYmFja2dyb3VuZC5wbmdQSwECFAMUAAAACADPmXJde6SOtUYAAABL
+AAAAMQAAAAAAAAAAAAAApIE/AQAAYXNzZXRzL21pbmVjcmFmdC90ZXh0dXJlcy9ndWkvbWVudV9i
+YWNrZ3JvdW5kLnBuZ1BLAQIUAxQAAAAIAM+Zcl17pI61RgAAAEsAAAA2AAAAAAAAAAAAAACkgdQB
+AABhc3NldHMvbWluZWNyYWZ0L3RleHR1cmVzL2d1aS9tZW51X2xpc3RfYmFja2dyb3VuZC5wbmdQ
+SwECFAMUAAAACADPmXJde6SOtUYAAABLAAAANAAAAAAAAAAAAAAApIFuAgAAYXNzZXRzL21pbmVj
+cmFmdC90ZXh0dXJlcy9ndWkvb3B0aW9uc19iYWNrZ3JvdW5kLnBuZ1BLAQIUAxQAAAAIAM+Zcl0d
+xribWQAAAGYAAAALAAAAAAAAAAAAAACkgQYDAABwYWNrLm1jbWV0YVBLBQYAAAAABgAGADECAACI
+AwAAAAA=
+PACK
+}
+
+# The installed versions, newest first; a picked one may be named by any part of its name.
+version=$(
+    "$launcher" versions --installed --json |
+        python3 -c '
+import json, sys
+installed = json.load(sys.stdin)["installed"]
+wanted = sys.argv[1]
+if not wanted:
+    print(installed[0] if installed else "")
+    sys.exit(0)
+for name in installed:
+    if name.lower() == wanted.lower():
+        print(name)
+        sys.exit(0)
+matches = [n for n in installed if wanted.lower() in n.lower()]
+# Native builds of a version carry its commit too: a plain build is the one wanted by default.
+plain = [n for n in matches if not n.startswith("native-")]
+matches = plain or matches
+if len(matches) == 1:
+    print(matches[0])
+elif matches:
+    print("several versions match %r: %s" % (wanted, ", ".join(matches)), file=sys.stderr)
+    sys.exit(1)
+else:
+    print("no installed version matches %r. Installed: %s" % (wanted, ", ".join(installed)), file=sys.stderr)
+    sys.exit(1)
+' "$wanted"
+) || exit 1
+
+[ -n "$version" ] || {
+    echo "no Horizon version is installed yet" >&2
+    exit 1
+}
+
+# The surfaces look needs the variable compiled in: the 13 November build has no such code.
+dir=$data/versions/$version
+old_build=0
+if [ -d "$dir" ] && ! grep -qas HORIZON_MENU_STYLE "$dir"/*.so "$dir"/horizon-client 2>/dev/null; then
+    old_build=1
+fi
+
+if [ "$dry" = 1 ]; then
+    echo "version: $version"
+    echo "pack:    $pack (installed and turned on if missing)"
+    if [ "$old_build" = 1 ]; then
+        echo "note:    this build predates the surfaces look (18 November, 0b14f8a); the veil stays"
+    fi
+    echo "run:     $launcher play --version $version $*"
+    exit 0
+fi
+
+# The transparent background textures: install them once, then keep them on.
+if ! "$launcher" packs list 2>/dev/null | grep -q "$pack"; then
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT INT TERM
+    pack_zip "$tmp/$pack"
+    "$launcher" packs add "$tmp/$pack" >/dev/null
+fi
+"$launcher" packs on "$pack" >/dev/null 2>&1 || true
+
+if [ "$old_build" = 1 ]; then
+    echo "note: $version predates the surfaces look (18 November build, 0b14f8a)." >&2
+    echo "      The veil stays there; only the resource pack takes effect." >&2
+fi
+
+exec env HORIZON_MENU_STYLE=vanilla "$launcher" play --version "$version" "$@"

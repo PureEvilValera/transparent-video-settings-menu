@@ -1,5 +1,5 @@
-# A release from a tag: validate, package, and attach the .hnmod. No local tooling needed.
-# Tag v0.1.1 must match the mod's version in bundle/mixins/<id>/horizon-mixin.toml.
+# A tag makes a release: the script alone, checked and with its SHA-256 in the notes.
+# Nothing is compiled; the asset is the file a player downloads.
 name: release
 on:
   push:
@@ -17,41 +17,71 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  RUST_VERSION: "1.99.1"
-
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: .ci/horizon
-      - name: The tag matches the mod's version
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
+      - name: Check the script and the pack it carries
         run: |
-          version=$(python3 -c 'import tomllib,glob;print(tomllib.load(open(glob.glob("bundle/mixins/*/horizon-mixin.toml")[0],"rb"))["mod"]["version"])')
-          [ "v$version" = "$TAG" ] || { echo "tag $TAG is not v$version"; exit 1; }
-          echo "VERSION=$version" >> "$GITHUB_ENV"
-      - name: Plan the bundle on the pinned Horizon
-        run: python3 tools/ci.py check
-      - name: Package
-        run: |
-          python3 tools/ci.py package | tee package.json
-          python3 -c 'import json;d=json.load(open("package.json"));print("SHA256="+d["sha256"])' >> "$GITHUB_ENV"
-          python3 -c 'import json;d=json.load(open("package.json"));print("FILE="+d["file"])' >> "$GITHUB_ENV"
+          set -eu
+          sh -n horizon-for-shader-debug
+          test -x horizon-for-shader-debug
+          # The embedded zip decodes, and holds the manifest and the five blank textures.
+          sed -n '/^pack_zip()/,/^}/p' horizon-for-shader-debug > /tmp/pack.sh
+          sh -c '. /tmp/pack.sh; pack_zip /tmp/pack.zip'
+          python3 - /tmp/pack.zip <<'PY'
+          import sys, zipfile
+          names = set(zipfile.ZipFile(sys.argv[1]).namelist())
+          want = {"pack.mcmeta"} | {
+              f"assets/minecraft/textures/gui/{n}.png"
+              for n in (
+                  "inworld_menu_background",
+                  "menu_background",
+                  "inworld_menu_list_background",
+                  "menu_list_background",
+                  "options_background",
+              )
+          }
+          assert names == want, (sorted(names), sorted(want))
+          print("pack ok:", len(names), "files")
+          PY
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release create "$TAG" "$FILE" \
-            --title "$VERSION" \
-            --notes "Transparent Video Settings Menu $VERSION: the dimming and the menu blur behind Horizon's settings screens are cancelled in a world. SHA-256: $SHA256" \
-            --verify-tag --generate-notes || gh release upload "$TAG" "$FILE" --clobber
+          set -eu
+          sha=$(sha256sum horizon-for-shader-debug | cut -d' ' -f1)
+          cat > notes.md <<EOF
+          Starts Horizon with the settings and shader-pack screens undimmed, for tuning shader packs.
+
+          **Install**
+
+          \`\`\`sh
+          mkdir -p ~/.local/bin
+          curl -LO https://github.com/${{ github.repository }}/releases/download/$TAG/horizon-for-shader-debug
+          mv horizon-for-shader-debug ~/.local/bin/
+          chmod +x ~/.local/bin/horizon-for-shader-debug
+          \`\`\`
+
+          \`~/.local/bin\` is on \`PATH\` in most setups; in fish, \`set -gx PATH \$HOME/.local/bin \$PATH\` adds it.
+
+          **Use**
+
+          \`\`\`sh
+          horizon-for-shader-debug               # the newest installed version
+          horizon-for-shader-debug 9f42064       # any installed version, by a part of its name
+          \`\`\`
+
+          It adds one resource pack of transparent menu textures to the instance (kept on) and
+          starts the game with \`HORIZON_MENU_STYLE=vanilla\`. The no-dimming look needs the 18
+          November build (\`0b14f8a\`) or newer; on older builds the tiled background goes and the
+          veil stays, and the script says so.
+
+          SHA-256: \`$sha\`
+          EOF
+          gh release create "$TAG" horizon-for-shader-debug \
+            --title "$TAG" --notes-file notes.md --verify-tag \
+            || gh release upload "$TAG" horizon-for-shader-debug --clobber
